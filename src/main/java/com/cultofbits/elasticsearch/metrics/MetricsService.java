@@ -1,8 +1,5 @@
 package com.cultofbits.elasticsearch.metrics;
 
-import com.codahale.metrics.Gauge;
-import com.codahale.metrics.MetricRegistry;
-import com.codahale.metrics.SharedMetricRegistries;
 import org.elasticsearch.ElasticsearchException;
 import org.elasticsearch.common.component.AbstractLifecycleComponent;
 import org.elasticsearch.common.inject.Inject;
@@ -42,19 +39,6 @@ public class MetricsService extends AbstractLifecycleComponent<MetricsService> {
             thread.start();
         }
 
-        // we run it manually once, to fill the names.
-        worker.updateStats();
-
-        MetricRegistry metrics = SharedMetricRegistries.getOrCreate("elasticsearch");
-
-        for (final String name : worker.getNames()) {
-            metrics.register(name, new Gauge<Long>() {
-                @Override
-                public Long getValue() {
-                    return worker.getCached(name);
-                }
-            });
-        }
     }
 
     @Override

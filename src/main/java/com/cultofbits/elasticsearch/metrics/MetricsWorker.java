@@ -1,5 +1,8 @@
 package com.cultofbits.elasticsearch.metrics;
 
+import com.codahale.metrics.Gauge;
+import com.codahale.metrics.MetricRegistry;
+import com.codahale.metrics.SharedMetricRegistries;
 import org.elasticsearch.action.admin.cluster.node.stats.NodeStats;
 import org.elasticsearch.index.engine.SegmentsStats;
 import org.elasticsearch.index.flush.FlushStats;
@@ -12,13 +15,14 @@ import org.elasticsearch.indices.NodeIndicesStats;
 import org.elasticsearch.node.service.NodeService;
 
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class MetricsWorker implements Runnable {
 
     private NodeService nodeService;
     private long interval;
+
+    private boolean alreadyRegistered = false;
 
     public volatile boolean stopping;
 
@@ -36,6 +40,8 @@ public class MetricsWorker implements Runnable {
             try {
                 Thread.sleep(interval);
                 updateStats();
+
+                if(!alreadyRegistered) registerMetrics();
 
             } catch (InterruptedException e) {
                 e.printStackTrace();
@@ -105,17 +111,24 @@ public class MetricsWorker implements Runnable {
 
     }
 
+    private void registerMetrics() {
+        MetricRegistry metrics = SharedMetricRegistries.getOrCreate("elasticsearch");
+
+        for (final String name : cachedGauges.keySet()) {
+            metrics.register(name, new Gauge<Long>() {
+                @Override
+                public Long getValue() {
+                    return cachedGauges.get(name);
+                }
+            });
+        }
+
+        alreadyRegistered = true;
+    }
+
     private static long ratio(long time, long count){
         if(count <= 0) return 0;
 
         return time / count;
-    }
-
-    public Set<String> getNames() {
-        return cachedGauges.keySet();
-    }
-
-    public Long getCached(String key) {
-        return cachedGauges.get(key);
     }
 }
