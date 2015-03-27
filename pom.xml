@@ -15,6 +15,24 @@
         <metrics.version>3.0.1</metrics.version>
     </properties>
 
+    <scm>
+        <developerConnection>scm:git:file://.</developerConnection>
+        <tag>HEAD</tag>
+    </scm>
+
+    <distributionManagement>
+        <snapshotRepository>
+            <id>cbi.libs-snapshots</id>
+            <name>cbi.libs-snapshots</name>
+            <url>http://demo.cob.pt:8081/artifactory/libs-snapshot-local</url>
+        </snapshotRepository>
+        <repository>
+            <id>cbi.libs-releases</id>
+            <name>cbi.libs-releases</name>
+            <url>http://demo.cob.pt:8081/artifactory/libs-release-local</url>
+        </repository>
+    </distributionManagement>
+
     <dependencies>
         <dependency>
             <groupId>org.elasticsearch</groupId>
@@ -51,6 +69,16 @@
                         </goals>
                     </execution>
                 </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-release-plugin</artifactId>
+                <version>2.5.1</version>
+                <configuration>
+                    <preparationGoals>clean install</preparationGoals>
+                    <autoVersionSubmodules>true</autoVersionSubmodules>
+                    <pushChanges>false</pushChanges>
+                </configuration>
             </plugin>
         </plugins>
     </build>
