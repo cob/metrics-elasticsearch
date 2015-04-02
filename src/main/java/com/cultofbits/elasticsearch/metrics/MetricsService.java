@@ -5,6 +5,7 @@ import org.elasticsearch.common.component.AbstractLifecycleComponent;
 import org.elasticsearch.common.inject.Inject;
 import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.common.util.concurrent.EsExecutors;
+import org.elasticsearch.indices.IndicesService;
 import org.elasticsearch.node.service.NodeService;
 
 public class MetricsService extends AbstractLifecycleComponent<MetricsService> {
@@ -16,11 +17,11 @@ public class MetricsService extends AbstractLifecycleComponent<MetricsService> {
 
 
     @Inject
-    public MetricsService(Settings settings, NodeService nodeService) {
+    public MetricsService(Settings settings, NodeService nodeService, IndicesService indicesService) {
         super(settings);
 
         interval = settings.getAsLong("metrics.interval", 60000L);
-        worker = new MetricsWorker(nodeService, interval);
+        worker = new MetricsWorker(nodeService, indicesService, interval);
     }
 
     @Override
