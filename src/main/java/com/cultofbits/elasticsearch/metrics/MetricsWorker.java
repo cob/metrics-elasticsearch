@@ -107,6 +107,7 @@ public class MetricsWorker implements Runnable {
                          ratio(merge.getTotalTimeInMillis(), merge.getTotal()));
         cachedGauges.put("indices.merge._all.docs", merge.getTotalNumDocs());
         cachedGauges.put("indices.merge._all.size", merge.getTotalSizeInBytes());
+        cachedGauges.put("indices.merge._all.current", merge.getCurrent());
         //someday add current values
 
         updateIndicesMergeStats();
@@ -173,6 +174,7 @@ public class MetricsWorker implements Runnable {
             long count = 0;
             long docs = 0;
             long size = 0;
+            long current = 0;
 
             for (IndexShard shard : service) {
                 MergeStats stats = shard.mergeStats();
@@ -180,12 +182,14 @@ public class MetricsWorker implements Runnable {
                 count += stats.getTotal();
                 docs += stats.getTotalNumDocs();
                 size += stats.getTotalSizeInBytes();
+                current += stats.getCurrent();
             }
 
             cachedGauges.put("indices.merge." + indexName + ".time", time);
             cachedGauges.put("indices.merge." + indexName + ".count", count);
             cachedGauges.put("indices.merge." + indexName + ".docs", docs);
             cachedGauges.put("indices.merge." + indexName + ".size", size);
+            cachedGauges.put("indices.merge." + indexName + ".current", current);
         }
     }
 
