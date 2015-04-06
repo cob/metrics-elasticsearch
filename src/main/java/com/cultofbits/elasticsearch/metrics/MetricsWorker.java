@@ -25,6 +25,7 @@ public class MetricsWorker implements Runnable {
     private NodeService nodeService;
     private IndicesService indicesService;
     private long interval;
+    private String[] indexesToInclude;
 
     private boolean alreadyRegistered = false;
 
@@ -32,10 +33,11 @@ public class MetricsWorker implements Runnable {
 
     private Map<String, Long> cachedGauges = new ConcurrentHashMap<>();
 
-    public MetricsWorker(NodeService nodeService, IndicesService indicesService, long interval) {
+    public MetricsWorker(NodeService nodeService, IndicesService indicesService, long interval, String[] indexesToInclude) {
         this.nodeService = nodeService;
         this.indicesService = indicesService;
         this.interval = interval;
+        this.indexesToInclude = indexesToInclude;
     }
 
 
@@ -123,7 +125,8 @@ public class MetricsWorker implements Runnable {
     }
 
     private void updateIndicesDocsStats() {
-        for (IndexService service : indicesService) {
+        for (String indexName : indexesToInclude) {
+            IndexService service = indicesService.indexServiceSafe(indexName);
             long count = 0;
             long deleted = 0;
 
@@ -133,13 +136,15 @@ public class MetricsWorker implements Runnable {
                 deleted += stats.getDeleted();
             }
 
-            cachedGauges.put("indices.docs." + service.index().name() + ".count", count);
-            cachedGauges.put("indices.docs." + service.index().name() + ".deleted", deleted);
+            cachedGauges.put("indices.docs." + indexName + ".count", count);
+            cachedGauges.put("indices.docs." + indexName + ".deleted", deleted);
         }
     }
 
     private void updateIndicesIndexingStats() {
-        for (IndexService service : indicesService) {
+        for (String indexName : indexesToInclude) {
+            IndexService service = indicesService.indexServiceSafe(indexName);
+
             long count = 0;
             long time = 0;
             long deleted = 0;
@@ -153,15 +158,17 @@ public class MetricsWorker implements Runnable {
                 deletedTime += stats.getDeleteTimeInMillis();
             }
 
-            cachedGauges.put("indices.indexing." + service.index().name() + ".index-count", count);
-            cachedGauges.put("indices.indexing." + service.index().name() + ".index-time", time);
-            cachedGauges.put("indices.indexing." + service.index().name() + ".delete-count", deleted);
-            cachedGauges.put("indices.indexing." + service.index().name() + ".delete-time", deletedTime);
+            cachedGauges.put("indices.indexing." + indexName + ".index-count", count);
+            cachedGauges.put("indices.indexing." + indexName + ".index-time", time);
+            cachedGauges.put("indices.indexing." + indexName + ".delete-count", deleted);
+            cachedGauges.put("indices.indexing." + indexName + ".delete-time", deletedTime);
         }
     }
 
     private void updateIndicesMergeStats() {
-        for (IndexService service : indicesService) {
+        for (String indexName : indexesToInclude) {
+            IndexService service = indicesService.indexServiceSafe(indexName);
+
             long time = 0;
             long count = 0;
             long docs = 0;
@@ -175,10 +182,10 @@ public class MetricsWorker implements Runnable {
                 size += stats.getTotalSizeInBytes();
             }
 
-            cachedGauges.put("indices.merge." + service.index().name() + ".time", time);
-            cachedGauges.put("indices.merge." + service.index().name() + ".count", count);
-            cachedGauges.put("indices.merge." + service.index().name() + ".docs", docs);
-            cachedGauges.put("indices.merge." + service.index().name() + ".size", size);
+            cachedGauges.put("indices.merge." + indexName + ".time", time);
+            cachedGauges.put("indices.merge." + indexName + ".count", count);
+            cachedGauges.put("indices.merge." + indexName + ".docs", docs);
+            cachedGauges.put("indices.merge." + indexName + ".size", size);
         }
     }
 

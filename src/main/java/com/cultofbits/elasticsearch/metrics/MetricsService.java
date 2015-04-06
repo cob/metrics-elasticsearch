@@ -1,6 +1,8 @@
 package com.cultofbits.elasticsearch.metrics;
 
 import org.elasticsearch.ElasticsearchException;
+import org.elasticsearch.action.support.IndicesOptions;
+import org.elasticsearch.cluster.ClusterService;
 import org.elasticsearch.common.component.AbstractLifecycleComponent;
 import org.elasticsearch.common.inject.Inject;
 import org.elasticsearch.common.settings.Settings;
@@ -17,11 +19,16 @@ public class MetricsService extends AbstractLifecycleComponent<MetricsService> {
 
 
     @Inject
-    public MetricsService(Settings settings, NodeService nodeService, IndicesService indicesService) {
+    public MetricsService(Settings settings,
+                          NodeService nodeService, IndicesService indicesService, ClusterService clusterService) {
         super(settings);
 
         interval = settings.getAsLong("metrics.interval", 60000L);
-        worker = new MetricsWorker(nodeService, indicesService, interval);
+        String[] indexesToInclude = clusterService.state().metaData().concreteIndices(
+            IndicesOptions.strictExpandOpen(),
+            settings.get("metrics.indexes-to-include", "_all").split(",")
+        );
+        worker = new MetricsWorker(nodeService, indicesService, interval, indexesToInclude);
     }
 
     @Override
