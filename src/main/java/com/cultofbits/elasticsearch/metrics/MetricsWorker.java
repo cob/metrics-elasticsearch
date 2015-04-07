@@ -4,6 +4,9 @@ import com.codahale.metrics.Gauge;
 import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.SharedMetricRegistries;
 import org.elasticsearch.action.admin.cluster.node.stats.NodeStats;
+import org.elasticsearch.action.support.IndicesOptions;
+import org.elasticsearch.cluster.ClusterService;
+import org.elasticsearch.common.logging.ESLogger;
 import org.elasticsearch.index.engine.SegmentsStats;
 import org.elasticsearch.index.flush.FlushStats;
 import org.elasticsearch.index.indexing.IndexingStats;
@@ -22,22 +25,31 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class MetricsWorker implements Runnable {
 
+    private ESLogger logger;
     private NodeService nodeService;
     private IndicesService indicesService;
     private long interval;
-    private String[] indexesToInclude;
+
+    private ClusterService clusterService;
+    private String[] indexesToResolve;
+    private String[] indexesToInclude = new String[0];
 
     private boolean alreadyRegistered = false;
+    private boolean indicesResolved = false;
 
     public volatile boolean stopping;
 
     private Map<String, Long> cachedGauges = new ConcurrentHashMap<>();
 
-    public MetricsWorker(NodeService nodeService, IndicesService indicesService, long interval, String[] indexesToInclude) {
+    public MetricsWorker(ESLogger logger,
+                         NodeService nodeService, IndicesService indicesService, long interval,
+                         ClusterService clusterService, String[] indexesToResolve) {
+        this.logger = logger;
         this.nodeService = nodeService;
         this.indicesService = indicesService;
         this.interval = interval;
-        this.indexesToInclude = indexesToInclude;
+        this.clusterService = clusterService;
+        this.indexesToResolve = indexesToResolve;
     }
 
 
@@ -46,6 +58,9 @@ public class MetricsWorker implements Runnable {
         while (!stopping) {
             try {
                 Thread.sleep(interval);
+
+                if(!indicesResolved) resolveIndices();
+
                 updateStats();
 
                 if(!alreadyRegistered) registerMetrics();
@@ -54,6 +69,28 @@ public class MetricsWorker implements Runnable {
                 e.printStackTrace();
             }
         }
+
+    }
+
+    private void resolveIndices() {
+        if(indexesToResolve.length == 0) {
+            logger.info("Will not track indices stats");
+            indicesResolved = true;
+        }
+
+        String[] indexesToInclude = clusterService.state().metaData().concreteIndices(
+            IndicesOptions.lenientExpandOpen(),
+            indexesToResolve
+        );
+
+        if(indexesToInclude.length > 0) {
+            logger.info("Will track stats for the indices [{}], resolved from [{}]",
+                        indexesToInclude,
+                        indexesToResolve);
+            indicesResolved = true;
+            this.indexesToInclude = indexesToInclude;
+        }
+
 
     }
 

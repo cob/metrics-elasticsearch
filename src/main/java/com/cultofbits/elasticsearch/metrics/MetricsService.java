@@ -24,25 +24,22 @@ public class MetricsService extends AbstractLifecycleComponent<MetricsService> {
         super(settings);
 
         interval = settings.getAsLong("metrics.interval", 60000L);
-        String[] indexesToInclude = clusterService.state().metaData().concreteIndices(
-            IndicesOptions.lenientExpandOpen(),
-            settings.get("metrics.indexes-to-include", "_all").split(",")
-        );
 
-        logger.info("Will track stats for the indices {}, resolved from {}",
-                    indexesToInclude,
-                    settings.get("metrics.indexes-to-include", "_all"));
-        worker = new MetricsWorker(nodeService, indicesService, interval, indexesToInclude);
+        String indicesToInclude = settings.get("metrics.indexes-to-include", "");
+        worker = new MetricsWorker(logger,
+                                   nodeService, indicesService, interval,
+                                   clusterService,
+                                   indicesToInclude.length() > 0 ? indicesToInclude.split(",") : new String[0]);
     }
 
     @Override
     protected void doStart() throws ElasticsearchException {
-        logger.info("Starting Metrics Service");
-
         if (interval <= 0){
             logger.info("metrics.interval <= 0, skipping Metrics Service start.");
             return;
         }
+
+        logger.info("Starting Metrics Service");
 
         if (thread == null || !thread.isAlive()) {
 
