@@ -61,7 +61,15 @@ public class MetricsWorker implements Runnable {
 
                 if(!indicesResolved) resolveIndices();
 
-                updateStats();
+                updateTotalStats();
+
+                for (String indexName : indexesToInclude) {
+                    IndexService service = indicesService.indexServiceSafe(indexName);
+
+                    updateIndicesDocsStats(indexName, service);
+                    updateIndicesIndexingStats(indexName, service);
+                    updateIndicesMergeStats(indexName, service);
+                }
 
                 if(!alreadyRegistered) registerMetrics();
 
@@ -94,7 +102,7 @@ public class MetricsWorker implements Runnable {
 
     }
 
-    void updateStats() {
+    void updateTotalStats() {
         NodeStats stats = nodeService.stats();
 
         NodeIndicesStats indices = stats.getIndices();
@@ -102,8 +110,6 @@ public class MetricsWorker implements Runnable {
         DocsStats docs = indices.getDocs();
         cachedGauges.put("indices.docs._all.count", docs.getCount());
         cachedGauges.put("indices.docs._all.deleted", docs.getDeleted());
-
-        updateIndicesDocsStats();
 
         SearchStats.Stats search = indices.getSearch().getTotal();
         cachedGauges.put("indices.search._all.query-time", search.getQueryTimeInMillis());
@@ -129,7 +135,6 @@ public class MetricsWorker implements Runnable {
                          ratio(indexing.getDeleteTimeInMillis(), indexing.getDeleteCount()));
         cachedGauges.put("indices.indexing._all.delete-current", indexing.getDeleteCurrent());
 
-        updateIndicesIndexingStats();
 
         FlushStats flush = indices.getFlush();
         cachedGauges.put("indices.flush._all.time", flush.getTotalTimeInMillis());
@@ -145,9 +150,6 @@ public class MetricsWorker implements Runnable {
         cachedGauges.put("indices.merge._all.docs", merge.getTotalNumDocs());
         cachedGauges.put("indices.merge._all.size", merge.getTotalSizeInBytes());
         cachedGauges.put("indices.merge._all.current", merge.getCurrent());
-        //someday add current values
-
-        updateIndicesMergeStats();
 
         RefreshStats refresh = indices.getRefresh();
         cachedGauges.put("indices.refresh._all.time", refresh.getTotalTimeInMillis());
@@ -162,72 +164,61 @@ public class MetricsWorker implements Runnable {
 
     }
 
-    private void updateIndicesDocsStats() {
-        for (String indexName : indexesToInclude) {
-            IndexService service = indicesService.indexServiceSafe(indexName);
-            long count = 0;
-            long deleted = 0;
+    private void updateIndicesDocsStats(String indexName, IndexService service) {
+        long count = 0;
+        long deleted = 0;
 
-            for (IndexShard shard : service) {
-                DocsStats stats = shard.docStats();
-                count += stats.getCount();
-                deleted += stats.getDeleted();
-            }
-
-            cachedGauges.put("indices.docs." + indexName + ".count", count);
-            cachedGauges.put("indices.docs." + indexName + ".deleted", deleted);
+        for (IndexShard shard : service) {
+            DocsStats stats = shard.docStats();
+            count += stats.getCount();
+            deleted += stats.getDeleted();
         }
+
+        cachedGauges.put("indices.docs." + indexName + ".count", count);
+        cachedGauges.put("indices.docs." + indexName + ".deleted", deleted);
     }
 
-    private void updateIndicesIndexingStats() {
-        for (String indexName : indexesToInclude) {
-            IndexService service = indicesService.indexServiceSafe(indexName);
+    private void updateIndicesIndexingStats(String indexName, IndexService service) {
+        long count = 0;
+        long time = 0;
+        long deleted = 0;
+        long deletedTime = 0;
 
-            long count = 0;
-            long time = 0;
-            long deleted = 0;
-            long deletedTime = 0;
-
-            for (IndexShard shard : service) {
-                IndexingStats.Stats stats = shard.indexingStats("_all").getTotal();
-                count += stats.getIndexCount();
-                time += stats.getIndexTimeInMillis();
-                deleted += stats.getDeleteCount();
-                deletedTime += stats.getDeleteTimeInMillis();
-            }
-
-            cachedGauges.put("indices.indexing." + indexName + ".index-count", count);
-            cachedGauges.put("indices.indexing." + indexName + ".index-time", time);
-            cachedGauges.put("indices.indexing." + indexName + ".delete-count", deleted);
-            cachedGauges.put("indices.indexing." + indexName + ".delete-time", deletedTime);
+        for (IndexShard shard : service) {
+            IndexingStats.Stats stats = shard.indexingStats("_all").getTotal();
+            count += stats.getIndexCount();
+            time += stats.getIndexTimeInMillis();
+            deleted += stats.getDeleteCount();
+            deletedTime += stats.getDeleteTimeInMillis();
         }
+
+        cachedGauges.put("indices.indexing." + indexName + ".index-count", count);
+        cachedGauges.put("indices.indexing." + indexName + ".index-time", time);
+        cachedGauges.put("indices.indexing." + indexName + ".delete-count", deleted);
+        cachedGauges.put("indices.indexing." + indexName + ".delete-time", deletedTime);
     }
 
-    private void updateIndicesMergeStats() {
-        for (String indexName : indexesToInclude) {
-            IndexService service = indicesService.indexServiceSafe(indexName);
+    private void updateIndicesMergeStats(String indexName, IndexService service) {
+        long time = 0;
+        long count = 0;
+        long docs = 0;
+        long size = 0;
+        long current = 0;
 
-            long time = 0;
-            long count = 0;
-            long docs = 0;
-            long size = 0;
-            long current = 0;
-
-            for (IndexShard shard : service) {
-                MergeStats stats = shard.mergeStats();
-                time += stats.getTotalTimeInMillis();
-                count += stats.getTotal();
-                docs += stats.getTotalNumDocs();
-                size += stats.getTotalSizeInBytes();
-                current += stats.getCurrent();
-            }
-
-            cachedGauges.put("indices.merge." + indexName + ".time", time);
-            cachedGauges.put("indices.merge." + indexName + ".count", count);
-            cachedGauges.put("indices.merge." + indexName + ".docs", docs);
-            cachedGauges.put("indices.merge." + indexName + ".size", size);
-            cachedGauges.put("indices.merge." + indexName + ".current", current);
+        for (IndexShard shard : service) {
+            MergeStats stats = shard.mergeStats();
+            time += stats.getTotalTimeInMillis();
+            count += stats.getTotal();
+            docs += stats.getTotalNumDocs();
+            size += stats.getTotalSizeInBytes();
+            current += stats.getCurrent();
         }
+
+        cachedGauges.put("indices.merge." + indexName + ".time", time);
+        cachedGauges.put("indices.merge." + indexName + ".count", count);
+        cachedGauges.put("indices.merge." + indexName + ".docs", docs);
+        cachedGauges.put("indices.merge." + indexName + ".size", size);
+        cachedGauges.put("indices.merge." + indexName + ".current", current);
     }
 
     private void registerMetrics() {
