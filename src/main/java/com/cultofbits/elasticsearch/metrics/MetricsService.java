@@ -25,9 +25,13 @@ public class MetricsService extends AbstractLifecycleComponent<MetricsService> {
 
         interval = settings.getAsLong("metrics.interval", 60000L);
         String[] indexesToInclude = clusterService.state().metaData().concreteIndices(
-            IndicesOptions.strictExpandOpen(),
+            IndicesOptions.lenientExpandOpen(),
             settings.get("metrics.indexes-to-include", "_all").split(",")
         );
+
+        logger.info("Will track stats for the indices {}, resolved from {}",
+                    indexesToInclude,
+                    settings.get("metrics.indexes-to-include", "_all"));
         worker = new MetricsWorker(nodeService, indicesService, interval, indexesToInclude);
     }
 
