@@ -71,7 +71,7 @@ public class MetricsWorker implements Runnable {
                     updateIndicesMergeStats(indexName, service);
                 }
 
-                if(!alreadyRegistered) registerMetrics();
+                if (indicesResolved && !alreadyRegistered) registerMetrics();
 
             } catch (InterruptedException e) {
                 e.printStackTrace();
