@@ -67,13 +67,9 @@ public class MetricsWorker implements Runnable {
                 for (String indexName : indexesToInclude) {
                     IndexService service = indicesService.indexServiceSafe(indexName);
 
-                    try {
-                        updateIndicesDocsStats(indexName, service);
-                        updateIndicesIndexingStats(indexName, service);
-                        updateIndicesMergeStats(indexName, service);
-                    } catch (IllegalIndexShardStateException e) {
-                        logger.info("A shard is still not ready {{msg:{}}}", e.getMessage());
-                    }
+                    updateIndicesDocsStats(indexName, service);
+                    updateIndicesIndexingStats(indexName, service);
+                    updateIndicesMergeStats(indexName, service);
                 }
 
                 if (indicesResolved && !alreadyRegistered) registerMetrics();
@@ -173,10 +169,14 @@ public class MetricsWorker implements Runnable {
         long count = 0;
         long deleted = 0;
 
-        for (IndexShard shard : service) {
-            DocsStats stats = shard.docStats();
-            count += stats.getCount();
-            deleted += stats.getDeleted();
+        try {
+            for (IndexShard shard : service) {
+                DocsStats stats = shard.docStats();
+                count += stats.getCount();
+                deleted += stats.getDeleted();
+            }
+        } catch (IllegalIndexShardStateException e) {
+            logger.info("A shard is still not ready {{msg:{}}}", e.getMessage());
         }
 
         cachedGauges.put("indices.docs." + indexName + ".count", count);
@@ -191,15 +191,19 @@ public class MetricsWorker implements Runnable {
         long deletedTime = 0;
         long deleteCurrent = 0;
 
-        for (IndexShard shard : service) {
-            IndexingStats.Stats stats = shard.indexingStats("_all").getTotal();
-            count += stats.getIndexCount();
-            time += stats.getIndexTimeInMillis();
-            current += stats.getIndexCurrent();
+        try {
+            for (IndexShard shard : service) {
+                IndexingStats.Stats stats = shard.indexingStats("_all").getTotal();
+                count += stats.getIndexCount();
+                time += stats.getIndexTimeInMillis();
+                current += stats.getIndexCurrent();
 
-            deleted += stats.getDeleteCount();
-            deletedTime += stats.getDeleteTimeInMillis();
-            deleteCurrent += stats.getDeleteCurrent();
+                deleted += stats.getDeleteCount();
+                deletedTime += stats.getDeleteTimeInMillis();
+                deleteCurrent += stats.getDeleteCurrent();
+            }
+        } catch (IllegalIndexShardStateException e) {
+            logger.info("A shard is still not ready {{msg:{}}}", e.getMessage());
         }
 
         cachedGauges.put("indices.indexing." + indexName + ".index-count", count);
@@ -217,13 +221,17 @@ public class MetricsWorker implements Runnable {
         long size = 0;
         long current = 0;
 
-        for (IndexShard shard : service) {
-            MergeStats stats = shard.mergeStats();
-            time += stats.getTotalTimeInMillis();
-            count += stats.getTotal();
-            docs += stats.getTotalNumDocs();
-            size += stats.getTotalSizeInBytes();
-            current += stats.getCurrent();
+        try {
+            for (IndexShard shard : service) {
+                MergeStats stats = shard.mergeStats();
+                time += stats.getTotalTimeInMillis();
+                count += stats.getTotal();
+                docs += stats.getTotalNumDocs();
+                size += stats.getTotalSizeInBytes();
+                current += stats.getCurrent();
+            }
+        } catch (IllegalIndexShardStateException e) {
+            logger.info("A shard is still not ready {{msg:{}}}", e.getMessage());
         }
 
         cachedGauges.put("indices.merge." + indexName + ".time", time);
