@@ -15,6 +15,7 @@ import org.elasticsearch.index.refresh.RefreshStats;
 import org.elasticsearch.index.search.stats.SearchStats;
 import org.elasticsearch.index.service.IndexService;
 import org.elasticsearch.index.shard.DocsStats;
+import org.elasticsearch.index.shard.IllegalIndexShardStateException;
 import org.elasticsearch.index.shard.service.IndexShard;
 import org.elasticsearch.indices.IndicesService;
 import org.elasticsearch.indices.NodeIndicesStats;
@@ -59,16 +60,20 @@ public class MetricsWorker implements Runnable {
             try {
                 Thread.sleep(interval);
 
-                if(!indicesResolved) resolveIndices();
+                if (!indicesResolved) resolveIndices();
 
                 updateTotalStats();
 
                 for (String indexName : indexesToInclude) {
                     IndexService service = indicesService.indexServiceSafe(indexName);
 
-                    updateIndicesDocsStats(indexName, service);
-                    updateIndicesIndexingStats(indexName, service);
-                    updateIndicesMergeStats(indexName, service);
+                    try {
+                        updateIndicesDocsStats(indexName, service);
+                        updateIndicesIndexingStats(indexName, service);
+                        updateIndicesMergeStats(indexName, service);
+                    } catch (IllegalIndexShardStateException e) {
+                        logger.info("A shard is still not ready {{msg:{}}}", e.getMessage());
+                    }
                 }
 
                 if (indicesResolved && !alreadyRegistered) registerMetrics();
@@ -230,6 +235,8 @@ public class MetricsWorker implements Runnable {
 
     private void registerMetrics() {
         MetricRegistry metrics = SharedMetricRegistries.getOrCreate("elasticsearch");
+
+        logger.info("registering [{}] metrics", cachedGauges.size());
 
         for (final String name : cachedGauges.keySet()) {
             metrics.register(name, new Gauge<Long>() {
