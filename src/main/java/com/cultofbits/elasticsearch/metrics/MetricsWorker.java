@@ -181,21 +181,28 @@ public class MetricsWorker implements Runnable {
     private void updateIndicesIndexingStats(String indexName, IndexService service) {
         long count = 0;
         long time = 0;
+        long current = 0;
         long deleted = 0;
         long deletedTime = 0;
+        long deleteCurrent = 0;
 
         for (IndexShard shard : service) {
             IndexingStats.Stats stats = shard.indexingStats("_all").getTotal();
             count += stats.getIndexCount();
             time += stats.getIndexTimeInMillis();
+            current += stats.getIndexCurrent();
+
             deleted += stats.getDeleteCount();
             deletedTime += stats.getDeleteTimeInMillis();
+            deleteCurrent += stats.getDeleteCurrent();
         }
 
         cachedGauges.put("indices.indexing." + indexName + ".index-count", count);
         cachedGauges.put("indices.indexing." + indexName + ".index-time", time);
+        cachedGauges.put("indices.indexing." + indexName + ".index-current", current);
         cachedGauges.put("indices.indexing." + indexName + ".delete-count", deleted);
         cachedGauges.put("indices.indexing." + indexName + ".delete-time", deletedTime);
+        cachedGauges.put("indices.indexing." + indexName + ".delete-current", deleteCurrent);
     }
 
     private void updateIndicesMergeStats(String indexName, IndexService service) {
