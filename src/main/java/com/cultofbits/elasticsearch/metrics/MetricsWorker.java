@@ -56,9 +56,9 @@ public class MetricsWorker implements Runnable {
 
     @Override
     public void run() {
-        while (!stopping) {
-            try {
-                Thread.sleep(interval);
+        try {
+            while (!stopping) {
+                try { Thread.sleep(interval); } catch (InterruptedException e) { /* nothing to do */ }
 
                 if (!indicesResolved) resolveIndices();
 
@@ -78,9 +78,9 @@ public class MetricsWorker implements Runnable {
 
                 if (indicesResolved && !alreadyRegistered) registerMetrics();
 
-            } catch (InterruptedException e) {
-                e.printStackTrace();
             }
+        } catch (Exception e) {
+            logger.error("no more metrics :(", e);
         }
 
     }
