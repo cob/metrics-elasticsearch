@@ -3,9 +3,12 @@ package com.cultofbits.elasticsearch.metrics;
 import com.codahale.metrics.Gauge;
 import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.SharedMetricRegistries;
+import org.elasticsearch.action.admin.cluster.health.ClusterHealthResponse;
+import org.elasticsearch.action.admin.cluster.health.ClusterIndexHealth;
 import org.elasticsearch.action.admin.cluster.node.stats.NodeStats;
 import org.elasticsearch.action.support.IndicesOptions;
 import org.elasticsearch.cluster.ClusterService;
+import org.elasticsearch.cluster.ClusterState;
 import org.elasticsearch.common.logging.ESLogger;
 import org.elasticsearch.index.engine.SegmentsStats;
 import org.elasticsearch.index.flush.FlushStats;
@@ -64,6 +67,8 @@ public class MetricsWorker implements Runnable {
 
                 updateTotalStats();
 
+                updateHealthStats();
+
                 for (String indexName : indexesToInclude) {
                     IndexService service = indicesService.indexServiceSafe(indexName);
 
@@ -81,8 +86,33 @@ public class MetricsWorker implements Runnable {
 
     }
 
+    private void updateHealthStats() {
+        ClusterState state = clusterService.state();
+        ClusterHealthResponse healthResponse =
+            new ClusterHealthResponse("unused cluster name", state.metaData().concreteAllOpenIndices(), state);
+
+        cachedGauges.put("indices.health._all.active-shards", (long) healthResponse.getActiveShards());
+        cachedGauges.put("indices.health._all.active-primary-shards", (long) healthResponse.getActivePrimaryShards());
+        cachedGauges.put("indices.health._all.relocating-shards", (long) healthResponse.getRelocatingShards());
+        cachedGauges.put("indices.health._all.initializing-shards", (long) healthResponse.getInitializingShards());
+        cachedGauges.put("indices.health._all.unassigned-shards", (long) healthResponse.getUnassignedShards());
+
+
+        Map<String, ClusterIndexHealth> indexHealthMap = healthResponse.getIndices();
+        for (String indexName : indexesToInclude) {
+            if (indexHealthMap.containsKey(indexName)) {
+                ClusterIndexHealth health = indexHealthMap.get(indexName);
+                cachedGauges.put("indices.health." + indexName + ".active-shards", (long) health.getActiveShards());
+                cachedGauges.put("indices.health." + indexName + ".active-primary-shards", (long) health.getActivePrimaryShards());
+                cachedGauges.put("indices.health." + indexName + ".relocating-shards", (long) health.getRelocatingShards());
+                cachedGauges.put("indices.health." + indexName + ".initializing-shards", (long) health.getInitializingShards());
+                cachedGauges.put("indices.health." + indexName + ".unassigned-shards", (long) health.getUnassignedShards());
+            }
+        }
+    }
+
     private void resolveIndices() {
-        if(indexesToResolve.length == 0) {
+        if (indexesToResolve.length == 0) {
             logger.info("Will not track indices stats");
             indicesResolved = true;
         }
@@ -92,7 +122,7 @@ public class MetricsWorker implements Runnable {
             indexesToResolve
         );
 
-        if(indexesToInclude.length > 0) {
+        if (indexesToInclude.length > 0) {
             logger.info("Will track stats for the indices [{}], resolved from [{}]",
                         indexesToInclude,
                         indexesToResolve);
@@ -258,8 +288,8 @@ public class MetricsWorker implements Runnable {
         alreadyRegistered = true;
     }
 
-    private static long ratio(long time, long count){
-        if(count <= 0) return 0;
+    private static long ratio(long time, long count) {
+        if (count <= 0) return 0;
 
         return time / count;
     }
