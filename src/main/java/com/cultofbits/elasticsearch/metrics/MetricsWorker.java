@@ -3,6 +3,7 @@ package com.cultofbits.elasticsearch.metrics;
 import com.codahale.metrics.Gauge;
 import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.SharedMetricRegistries;
+import com.codahale.metrics.Timer;
 import org.elasticsearch.action.admin.cluster.health.ClusterHealthResponse;
 import org.elasticsearch.action.admin.cluster.health.ClusterIndexHealth;
 import org.elasticsearch.action.admin.cluster.node.stats.NodeStats;
@@ -43,7 +44,9 @@ public class MetricsWorker implements Runnable {
 
     public volatile boolean stopping;
 
+    private MetricRegistry metrics;
     private Map<String, Long> cachedGauges = new ConcurrentHashMap<>();
+    private final Timer timer;
 
     public MetricsWorker(ESLogger logger,
                          NodeService nodeService, IndicesService indicesService, long interval,
@@ -54,6 +57,9 @@ public class MetricsWorker implements Runnable {
         this.interval = interval;
         this.clusterService = clusterService;
         this.indexesToResolve = indexesToResolve;
+
+        metrics = SharedMetricRegistries.getOrCreate("elasticsearch");
+        timer = metrics.timer("metrics.metrics._all.time");
     }
 
 
@@ -63,21 +69,28 @@ public class MetricsWorker implements Runnable {
             while (!stopping) {
                 try { Thread.sleep(interval); } catch (InterruptedException e) { /* nothing to do */ }
 
-                if (!indicesResolved) resolveIndices();
+                Timer.Context time = timer.time();
 
-                updateTotalStats();
+                try {
+                    if (!indicesResolved) resolveIndices();
 
-                updateHealthStats();
+                    updateTotalStats();
 
-                for (String indexName : indexesToInclude) {
-                    IndexService service = indicesService.indexServiceSafe(indexName);
+                    updateHealthStats();
 
-                    updateIndicesDocsStats(indexName, service);
-                    updateIndicesIndexingStats(indexName, service);
-                    updateIndicesMergeStats(indexName, service);
+                    for (String indexName : indexesToInclude) {
+                        IndexService service = indicesService.indexService(indexName);
+
+                        updateIndicesDocsStats(indexName, service);
+                        updateIndicesIndexingStats(indexName, service);
+                        updateIndicesMergeStats(indexName, service);
+                    }
+
+                    if (indicesResolved && !alreadyRegistered) registerMetrics();
+
+                } finally {
+                    time.stop();
                 }
-
-                if (indicesResolved && !alreadyRegistered) registerMetrics();
 
             }
         } catch (Exception e) {
@@ -278,8 +291,6 @@ public class MetricsWorker implements Runnable {
     }
 
     private void registerMetrics() {
-        MetricRegistry metrics = SharedMetricRegistries.getOrCreate("elasticsearch");
-
         logger.info("registering [{}] metrics", cachedGauges.size());
 
         for (final String name : cachedGauges.keySet()) {
