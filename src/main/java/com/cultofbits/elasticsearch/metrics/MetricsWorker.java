@@ -200,10 +200,12 @@ public class MetricsWorker implements Runnable {
         long deleted = 0;
 
         try {
-            for (IndexShard shard : service) {
-                DocsStats stats = shard.docStats();
-                count += stats.getCount();
-                deleted += stats.getDeleted();
+            if (service != null) {
+                for (IndexShard shard : service) {
+                    DocsStats stats = shard.docStats();
+                    count += stats.getCount();
+                    deleted += stats.getDeleted();
+                }
             }
         } catch (IllegalIndexShardStateException e) {
             logger.info("A shard is still not ready {{msg:{}}}", e.getMessage());
@@ -222,15 +224,17 @@ public class MetricsWorker implements Runnable {
         long deleteCurrent = 0;
 
         try {
-            for (IndexShard shard : service) {
-                IndexingStats.Stats stats = shard.indexingStats("_all").getTotal();
-                count += stats.getIndexCount();
-                time += stats.getIndexTimeInMillis();
-                current += stats.getIndexCurrent();
+            if (service != null) {
+                for (IndexShard shard : service) {
+                    IndexingStats.Stats stats = shard.indexingStats("_all").getTotal();
+                    count += stats.getIndexCount();
+                    time += stats.getIndexTimeInMillis();
+                    current += stats.getIndexCurrent();
 
-                deleted += stats.getDeleteCount();
-                deletedTime += stats.getDeleteTimeInMillis();
-                deleteCurrent += stats.getDeleteCurrent();
+                    deleted += stats.getDeleteCount();
+                    deletedTime += stats.getDeleteTimeInMillis();
+                    deleteCurrent += stats.getDeleteCurrent();
+                }
             }
         } catch (IllegalIndexShardStateException e) {
             logger.info("A shard is still not ready {{msg:{}}}", e.getMessage());
@@ -252,13 +256,15 @@ public class MetricsWorker implements Runnable {
         long current = 0;
 
         try {
-            for (IndexShard shard : service) {
-                MergeStats stats = shard.mergeStats();
-                time += stats.getTotalTimeInMillis();
-                count += stats.getTotal();
-                docs += stats.getTotalNumDocs();
-                size += stats.getTotalSizeInBytes();
-                current += stats.getCurrent();
+            if (service != null) {
+                for (IndexShard shard : service) {
+                    MergeStats stats = shard.mergeStats();
+                    time += stats.getTotalTimeInMillis();
+                    count += stats.getTotal();
+                    docs += stats.getTotalNumDocs();
+                    size += stats.getTotalSizeInBytes();
+                    current += stats.getCurrent();
+                }
             }
         } catch (IllegalIndexShardStateException e) {
             logger.info("A shard is still not ready {{msg:{}}}", e.getMessage());
