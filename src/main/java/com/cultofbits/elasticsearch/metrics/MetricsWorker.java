@@ -128,6 +128,7 @@ public class MetricsWorker implements Runnable {
         if (indexesToResolve.length == 0) {
             logger.info("Will not track indices stats");
             indicesResolved = true;
+            return;
         }
 
         String[] indexesToInclude = clusterService.state().metaData().concreteIndices(
